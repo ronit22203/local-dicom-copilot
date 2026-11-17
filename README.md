@@ -33,3 +33,9 @@ If you throw a raw medical scan straight at a Vision-Language Model (like Qwen-V
        ▼
 5. Audit Log (SQLite / JSONL)
           Links original image hash -> 3D mask -> final JSON report
+
+---
+
+## Docs
+
+Notes for what is in the repo today are in [docs/](docs/README.md).
