@@ -31,3 +31,6 @@ htmlcov/
 *.swo
 
 # data/raw_idc is tracked on purpose so downstream builders can clone the sample studies.
+
+# Generated copies from pipeline_monolith.py (poisoned and scrubbed studies)
+work/
