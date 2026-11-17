@@ -1,0 +1,26 @@
+[
+  {
+    "dataset_key": "chest_ct",
+    "collection_id": "lidc_idri",
+    "description": "Thoracic CT with lung nodule ground-truth annotations",
+    "patient_id": "LIDC-IDRI-0813",
+    "study_instance_uid": "1.3.6.1.4.1.14519.5.2.1.6279.6001.139110171863263699469684411692",
+    "series_instance_uid": "1.3.6.1.4.1.14519.5.2.1.6279.6001.100398138793540579077826395208",
+    "modality": "CT",
+    "series_description": null,
+    "downloaded_slices": 157,
+    "local_dir": "data/raw_idc/chest_ct"
+  },
+  {
+    "dataset_key": "brain_mri",
+    "collection_id": "upenn_gbm",
+    "description": "Multi-parametric Brain MRI (T1-Gd) for BraTS-style segmentation",
+    "patient_id": "UPENN-GBM-00349",
+    "study_instance_uid": "1.3.6.1.4.1.14519.5.2.1.329346041416609143531870833013122004069",
+    "series_instance_uid": "1.3.6.1.4.1.14519.5.2.1.100228913346117845888815167664188869177",
+    "modality": "MR",
+    "series_description": "t1 axial stealth-post : Processed_CaPTk",
+    "downloaded_slices": 192,
+    "local_dir": "data/raw_idc/brain_mri"
+  }
+]
