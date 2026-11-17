@@ -6,7 +6,8 @@ This project keeps scans on your machine. It removes patient details from DICOM 
 
 1. Two public sample studies are already in `data/raw_idc/`. See [Sample data](sample-data.md).
 2. `pipeline_monolith.py` copies a study, plants fake patient details, strips them, and checks that none remain. See [De-identification](scrubber.md).
+3. The same script measures 3D components and writes a FHIR report. The viewer loads that output. See [Measurements](measurements.md).
 
 ## Not built yet
 
-The root README describes a local Orthanc inbox, 3D measurement, a JSON report, and an audit log. Those steps are not in the repo yet.
+The root README also describes a local Orthanc inbox and an audit log. Those steps are not in the repo yet.
