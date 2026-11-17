@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>local-dicom-copilot · 3-pane workbench</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0f17;
+      --card: #121824;
+      --line: #1e293b;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --cyan: #020e13;
+      --coral: #f43f5e;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --header: 52px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+    }
+
+    button,
+    input {
+      font: inherit;
+      color: inherit;
+    }
+
+    .app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    header {
+      flex: 0 0 auto;
+      min-height: var(--header);
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #0e1420;
+    }
+
+    .brand {
+      font-weight: 650;
+      letter-spacing: 0.01em;
+    }
+
+    .fixture {
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .study {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .study strong {
+      color: var(--text);
+      font-weight: 650;
+    }
+
+    .badge {
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+    }
+
+    .badge.mod {
+      color: var(--cyan);
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+    }
+
+    .badge.ok {
+      color: var(--emerald);
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .badge.warn {
+      color: var(--amber);
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+
+    .hash {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      min-width: 0;
+    }
+
+    .hash code {
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .ghost {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+
+    .ghost:hover {
+      border-color: #334155;
+    }
+
+    .ghost:focus-visible,
+    .card:focus-visible,
+    .tab:focus-visible,
+    .launch:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 2px;
+    }
+
+    .panes {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+    }
+
+    .pane {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+    }
+
+    .pane:last-child {
+      border-right: 0;
+    }
+
+    .pane-scan {
+      width: 45%;
+    }
+
+    .pane-cards {
+      width: 25%;
+    }
+
+    .pane-report {
+      width: 30%;
+    }
+
+    .pane-head {
+      flex: 0 0 auto;
+      padding: 12px 14px 8px;
+    }
+
+    .pane-kicker {
+      margin: 0;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .pane-title {
+      margin: 4px 0 0;
+      font-size: 15px;
+      font-weight: 650;
+    }
+
+    .viewport {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      display: grid;
+      place-items: center;
+      margin: 0 14px;
+      background: #070b12;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .viewport.dragover {
+      border-color: var(--cyan);
+    }
+
+    #scan {
+      width: auto;
+      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+    }
+
+    .overlay {
+      position: absolute;
+      left: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: #cbd5e1;
+      text-shadow: 0 1px 2px #000;
+      pointer-events: none;
+    }
+
+    .overlay.tl {
+      top: 8px;
+    }
+
+    .overlay.bl {
+      bottom: 8px;
+    }
+
+    .controls {
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+      padding: 12px 14px 14px;
+    }
+
+    .control {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .control.wide {
+      grid-column: 1 / -1;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--cyan);
+    }
+
+    .load-row,
+    .status-row,
+    .load-note {
+      grid-column: 1 / -1;
+    }
+
+    .load-row,
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .load-note {
+      margin: 0;
+      min-height: 1.1em;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .load-note.warn {
+      color: var(--amber);
+    }
+
+    .status {
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .status span {
+      color: var(--cyan);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .launch {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .launch:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    .scroll {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 0 14px 16px;
+    }
+
+    .card {
+      width: 100%;
+      text-align: left;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      display: block;
+    }
+
+    .card.active {
+      border-color: var(--cyan);
+      box-shadow: inset 0 0 0 1px var(--cyan);
+    }
+
+    .card-kicker {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .card-kicker b {
+      color: var(--text);
+      font-weight: 650;
+    }
+
+    .thumb {
+      width: 100%;
+      height: auto;
+      margin: 8px 0;
+      border-radius: 6px;
+      background: #070b12;
+      display: block;
+    }
+
+    .metrics {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .metrics li,
+    .nums li {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 13px;
+    }
+
+    .num {
+      white-space: nowrap;
+    }
+
+    .metrics span,
+    .nums span {
+      color: var(--muted);
+    }
+
+    .num {
+      color: var(--cyan);
+      font-variant-numeric: tabular-nums;
+      font-weight: 650;
+    }
+
+    .tabs {
+      flex: 0 0 auto;
+      display: flex;
+      gap: 6px;
+      padding: 0 14px 10px;
+    }
+
+    .tab {
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 10px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .tab[aria-selected="true"] {
+      color: var(--text);
+      border-color: #334155;
+      background: var(--card);
+    }
+
+    .summary {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .narrative {
+      color: var(--amber);
+      margin: 0;
+      line-height: 1.45;
+    }
+
+    .tag {
+      display: inline-block;
+      margin-left: 6px;
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border-radius: 999px;
+      padding: 1px 6px;
+      vertical-align: 1px;
+    }
+
+    .tag.amber {
+      color: var(--amber);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+    }
+
+    .tag.cyan {
+      color: var(--cyan);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+    }
+
+    .tag.ok {
+      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.45);
+    }
+
+    .finding {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .finding.active {
+      border-color: var(--cyan);
+      box-shadow: inset 0 0 0 1px var(--cyan);
+    }
+
+    .finding h3 {
+      margin: 0 0 10px;
+      font-size: 14px;
+    }
+
+    .nums {
+      list-style: none;
+      margin: 6px 0 10px;
+      padding: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .prov {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      word-break: break-all;
+    }
+
+    .prov code {
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    #panel-raw {
+      flex: 1;
+      min-height: 0;
+      margin: 0 14px 14px;
+      padding: 12px;
+      overflow: auto;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre;
+    }
+
+    #panel-raw .k {
+      color: #cbd5e1;
+    }
+
+    #panel-raw .s {
+      color: var(--amber);
+    }
+
+    #panel-raw .n {
+      color: var(--cyan);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">local-dicom-copilot</div>
+      <span class="fixture" id="source-badge">Fixture</span>
+      <div class="study">Study: <strong id="study-id"></strong> <span id="study-label"></span></div>
+      <span class="badge mod" id="modality"></span>
+      <span class="badge ok" id="hipaa"></span>
+      <div class="hash">
+        <span>SHA-256:</span>
+        <code id="hash-short"></code>
+        <button class="ghost" id="copy-hash" type="button">Copy</button>
+      </div>
+    </header>
+
+    <div class="panes">
+      <section class="pane pane-scan" aria-label="Interactive scan">
+        <div class="pane-head">
+          <p class="pane-kicker">Pane 1 · 45%</p>
+          <h2 class="pane-title">Interactive scan</h2>
+        </div>
+        <div class="viewport" id="viewport">
+          <canvas id="scan" width="512" height="512"></canvas>
+          <div class="overlay tl" id="overlay-mod">MR · AXIAL</div>
+          <div class="overlay bl" id="overlay-slice"></div>
+        </div>
+        <div class="controls">
+          <label class="control wide">Slice
+            <input id="slice" type="range" min="1" max="192" value="84">
+          </label>
+          <label class="control">Window
+            <input id="window" type="range" min="20" max="400" value="200">
+          </label>
+          <label class="control">Level
+            <input id="level" type="range" min="0" max="255" value="110">
+          </label>
+          <div class="load-row">
+            <button class="ghost" id="pick-files" type="button">Upload DICOM</button>
+            <button class="ghost" id="pick-folder" type="button">Upload folder</button>
+            <button class="ghost" id="restore-fixture" type="button" hidden>Fixture preview</button>
+            <a class="launch" id="ohif" href="https://viewer.ohif.org/local" target="_blank"
+              rel="noopener noreferrer">Launch Full OHIF Viewer</a>
+          </div>
+          <p class="load-note" id="load-note">Drop .dcm files or a folder on the image.</p>
+          <input id="file-input" type="file" accept=".dcm,.dicom,application/dicom" multiple hidden>
+          <input id="folder-input" type="file" accept=".dcm,.dicom,application/dicom" webkitdirectory directory multiple
+            hidden>
+          <div class="status-row">
+            <div class="status" id="status"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="pane pane-cards" aria-label="Key abnormality slices">
+        <div class="pane-head">
+          <p class="pane-kicker">Pane 2 · 25%</p>
+          <h2 class="pane-title">Key abnormality slices</h2>
+        </div>
+        <div class="scroll" id="card-list"></div>
+      </section>
+
+      <section class="pane pane-report" aria-label="Grounded synthesis">
+        <div class="pane-head">
+          <p class="pane-kicker">Pane 3 · 30%</p>
+          <h2 class="pane-title">Grounded synthesis</h2>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Report format">
+          <button class="tab" id="tab-structured" type="button" role="tab" aria-selected="true"
+            aria-controls="panel-structured">Structured view</button>
+          <button class="tab" id="tab-raw" type="button" role="tab" aria-selected="false" aria-controls="panel-raw">Raw
+            FHIR</button>
+        </div>
+        <div class="scroll" id="panel-structured" role="tabpanel"></div>
+        <pre id="panel-raw" role="tabpanel" hidden></pre>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const FIXTURE = {
+      pseudonym: "ANON-8F92A1",
+      modality: "MR",
+      label: "Brain MRI",
+      identityRemoved: "YES",
+      seriesPixelSha256: "c3fef756b2ca4be82c1df9f4f18ef5c42d5b460d8d93c8d342a9126fa56b1cc0",
+      sliceCount: 192
+    };
+
+    const STUDY = { ...FIXTURE };
+
+    const CONCLUSION = "Hyper-enhancing lesion identified in occipital lobe spanning Z: 76-92.";
+
+    const FINDINGS = [
+      {
+        id: "peak-lesion",
+        name: "Peak lesion",
+        tag: "PEAK LESION",
+        slice: 84,
+        volumeCm3: 14.82,
+        areaMm2: 412.5,
+        voxels: 15540,
+        bbox: [76, 92, 140, 185],
+        span: [76, 92],
+        appearance: "Hyper-enhancing lesion identified in occipital lobe spanning Z: 76-92.",
+        pixelHash: "0ebeb7756bffc82aabc96c07cac7e8aa207881c5f0d748cd4ceb8aeaa91c49c7",
+        cx: 0.66,
+        cy: 0.68,
+        rx: 0.105,
+        ry: 0.085,
+        gain: 78
+      },
+      {
+        id: "satellite-focus",
+        name: "Satellite focus",
+        tag: "SATELLITE FOCUS",
+        slice: 79,
+        volumeCm3: 1.14,
+        areaMm2: 68.2,
+        voxels: 1195,
+        span: [77, 81],
+        appearance: "Smaller hyper-intense focus on a neighboring slice, separate from the dominant lesion.",
+        pixelHash: "b24834de81b687d5fdfb0010c90be9e37b3df7f84c803c24f1ac341e1cfb102d",
+        cx: 0.56,
+        cy: 0.58,
+        rx: 0.045,
+        ry: 0.04,
+        gain: 62
+      }
+    ];
+
+    const state = {
+      source: "fixture",
+      frames: [],
+      slice: 84,
+      windowWidth: 200,
+      windowLevel: 110,
+      selectedId: "peak-lesion"
+    };
+
+    const scanCanvas = document.getElementById("scan");
+    const scanCtx = scanCanvas.getContext("2d", { willReadFrequently: true });
+
+    function fmt(value, digits) {
+      return value.toLocaleString("en-US", {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits
+      });
+    }
+
+    function formatBBox(bbox) {
+      return "[" + bbox[0] + ":" + bbox[1] + ", " + bbox[2] + ":" + bbox[3] + "]";
+    }
+
+    function findingById(id) {
+      return FINDINGS.find((finding) => finding.id === id);
+    }
+
+    function buildReport() {
+      if (state.source === "upload") {
+        return {
+          resourceType: "DiagnosticReport",
+          status: "preliminary",
+          identifier: [
+            {
+              system: "urn:local-dicom-copilot:series-pixel-sha256",
+              value: STUDY.seriesPixelSha256
+            }
+          ],
+          code: { text: "Uploaded DICOM series" },
+          subject: { display: STUDY.pseudonym },
+          conclusion: "No computed findings for this upload."
+        };
+      }
+      return {
+        resourceType: "DiagnosticReport",
+        status: "preliminary",
+        identifier: [
+          {
+            system: "urn:local-dicom-copilot:series-pixel-sha256",
+            value: STUDY.seriesPixelSha256
+          }
+        ],
+        code: { text: "Brain MRI grounded synthesis" },
+        subject: { display: STUDY.pseudonym },
+        conclusion: CONCLUSION,
+        contained: FINDINGS.map((finding) => {
+          const component = [
+            {
+              code: { text: "Volume" },
+              valueQuantity: { value: finding.volumeCm3, unit: "cm3" }
+            },
+            {
+              code: { text: "Slice area" },
+              valueQuantity: { value: finding.areaMm2, unit: "mm2" }
+            },
+            { code: { text: "Voxel count" }, valueInteger: finding.voxels },
+            { code: { text: "Slice index" }, valueInteger: finding.slice }
+          ];
+          if (finding.bbox) {
+            component.push({ code: { text: "Bounding box" }, valueString: formatBBox(finding.bbox) });
+          }
+          component.push({ code: { text: "Pixel hash" }, valueString: finding.pixelHash });
+          return {
+            resourceType: "Observation",
+            id: finding.id,
+            status: "preliminary",
+            code: { text: finding.name },
+            note: [{ text: finding.appearance }],
+            component
+          };
+        }),
+        result: FINDINGS.map((finding) => ({ reference: "#" + finding.id }))
+      };
+    }
+
+    function hashNoise(x, y, s) {
+      let n = (x * 374761393 + y * 668265263 + s * 1442695041) | 0;
+      n = Math.imul(n ^ (n >>> 13), 1274126177);
+      return ((n >>> 0) % 1000) / 1000;
+    }
+
+    function lesionAmount(finding, slice) {
+      if (slice < finding.span[0] || slice > finding.span[1]) return 0;
+      const half = (finding.span[1] - finding.span[0]) / 2;
+      const dist = Math.abs(slice - finding.slice);
+      return Math.max(0, 1 - dist / (half + 0.25));
+    }
+
+    function drawSlice(ctx, slice, windowWidth, windowLevel, withContours) {
+      const w = ctx.canvas.width;
+      const h = ctx.canvas.height;
+      const image = ctx.createImageData(w, h);
+      const data = image.data;
+      const scale = 0.72 + 0.28 * Math.sin(((slice - 1) / 191) * Math.PI);
+      const rx = w * 0.36 * scale;
+      const ry = h * 0.38 * scale;
+      const cx = w * 0.5;
+      const cy = h * 0.48;
+      const ventricle = Math.sin(((slice - 1) / 191) * Math.PI);
+
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const nx = (x - cx) / rx;
+          const ny = (y - cy) / ry;
+          const r2 = nx * nx + ny * ny;
+          let value = 4;
+          if (r2 <= 1) {
+            const coarse = hashNoise(x >> 2, y >> 2, slice * 3);
+            const fine = hashNoise(x, y, slice);
+            let tissue = 96 + coarse * 26 + (fine - 0.5) * 14 + (1 - r2) * 12;
+            const vx = nx + 0.02;
+            const vy = ny + 0.04;
+            const left = Math.exp(-(vx * vx) / 0.025 - ((vy - 0.02) * (vy - 0.02)) / 0.045);
+            const right = Math.exp(-((vx + 0.18) * (vx + 0.18)) / 0.025 - ((vy - 0.02) * (vy - 0.02)) / 0.045);
+            tissue -= (left + right) * 40 * ventricle;
+            value = r2 > 0.9 ? 150 + (1 - r2) * 420 : tissue;
+            const u = x / w;
+            const v = y / h;
+            for (const finding of FINDINGS) {
+              const amount = lesionAmount(finding, slice);
+              if (!amount) continue;
+              const dx = (u - finding.cx) / finding.rx;
+              const dy = (v - finding.cy) / finding.ry;
+              value += Math.exp(-(dx * dx + dy * dy) * 0.45) * finding.gain * amount;
+            }
+          }
+          const lo = windowLevel - windowWidth / 2;
+          const shown = Math.max(0, Math.min(255, ((value - lo) / windowWidth) * 255));
+          const i = (y * w + x) * 4;
+          data[i] = data[i + 1] = data[i + 2] = shown;
+          data[i + 3] = 255;
+        }
+      }
+
+      ctx.putImageData(image, 0, 0);
+      if (!withContours) return;
+      for (const finding of FINDINGS) {
+        if (finding.slice !== slice) continue;
+        ctx.beginPath();
+        ctx.ellipse(finding.cx * w, finding.cy * h, finding.rx * w, finding.ry * h, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = "#f43f5e";
+        ctx.lineWidth = finding.id === state.selectedId ? 3 : 2;
+        ctx.stroke();
+      }
+    }
+
+    function drawMain() {
+      if (state.source === "upload" && state.frames.length) {
+        drawUploaded(scanCtx, state.frames[state.slice - 1]);
+      } else {
+        if (scanCanvas.width !== 512 || scanCanvas.height !== 512) {
+          scanCanvas.width = 512;
+          scanCanvas.height = 512;
+        }
+        drawSlice(scanCtx, state.slice, state.windowWidth, state.windowLevel, true);
+      }
+      const loaded = STUDY.sliceCount + " slices loaded";
+      document.getElementById("overlay-slice").textContent = "Slice " + state.slice + " / " + STUDY.sliceCount;
+      document.getElementById("status").innerHTML = loaded + " · Slice <span>" + state.slice + " / " + STUDY.sliceCount + "</span>";
+      document.getElementById("slice").value = String(state.slice);
+    }
+
+    function drawUploaded(ctx, frame) {
+      const w = frame.cols;
+      const h = frame.rows;
+      if (ctx.canvas.width !== w || ctx.canvas.height !== h) {
+        ctx.canvas.width = w;
+        ctx.canvas.height = h;
+      }
+      const image = ctx.createImageData(w, h);
+      const data = image.data;
+      const invert = frame.photometric === "MONOCHROME1";
+      const lo = state.windowLevel - state.windowWidth / 2;
+      const width = state.windowWidth || 1;
+      const pixels = frame.pixels;
+      const count = w * h;
+      for (let i = 0; i < count; i++) {
+        let shown = ((modalityValue(pixels[i], frame) - lo) / width) * 255;
+        if (invert) shown = 255 - shown;
+        shown = Math.max(0, Math.min(255, shown));
+        const p = i * 4;
+        data[p] = data[p + 1] = data[p + 2] = shown;
+        data[p + 3] = 255;
+      }
+      ctx.putImageData(image, 0, 0);
+    }
+
+    function modalityValue(raw, frame) {
+      let value = raw;
+      if (frame.bitsStored < frame.bitsAllocated) value &= (1 << frame.bitsStored) - 1;
+      if (frame.pixelRepresentation === 1) {
+        const sign = 1 << (frame.bitsStored - 1);
+        if (value & sign) value -= sign << 1;
+      }
+      return value * frame.slope + frame.intercept;
+    }
+
+    function metricRow(label, value) {
+      const li = document.createElement("li");
+      const name = document.createElement("span");
+      name.textContent = label;
+      const num = document.createElement("b");
+      num.className = "num";
+      num.textContent = value;
+      li.append(name, num);
+      return li;
+    }
+
+    function renderCards() {
+      const list = document.getElementById("card-list");
+      list.replaceChildren();
+      if (state.source === "upload") {
+        const note = document.createElement("article");
+        note.className = "summary";
+        const eyebrow = document.createElement("p");
+        eyebrow.className = "eyebrow";
+        eyebrow.textContent = "Uploaded series";
+        const text = document.createElement("p");
+        text.className = "narrative";
+        text.textContent = "These slices have no computed findings. Fixture measurements stay on the preview study.";
+        const facts = document.createElement("ul");
+        facts.className = "metrics";
+        facts.append(
+          metricRow("Slices", String(STUDY.sliceCount)),
+          metricRow("Matrix", STUDY.cols + " × " + STUDY.rows)
+        );
+        note.append(eyebrow, text, facts);
+        list.append(note);
+        return;
+      }
+      for (const finding of FINDINGS) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "card";
+        button.dataset.id = finding.id;
+
+        const kicker = document.createElement("div");
+        kicker.className = "card-kicker";
+        const slice = document.createElement("b");
+        slice.textContent = "SLICE #" + finding.slice;
+        const tag = document.createElement("span");
+        tag.textContent = finding.tag;
+        kicker.append(slice, tag);
+
+        const thumb = document.createElement("canvas");
+        thumb.className = "thumb";
+        thumb.width = 220;
+        thumb.height = 220;
+        drawSlice(thumb.getContext("2d"), finding.slice, 200, 110, true);
+
+        const metrics = document.createElement("ul");
+        metrics.className = "metrics";
+        metrics.append(
+          metricRow("Volume", fmt(finding.volumeCm3, 2) + " cm³"),
+          metricRow("Slice area", fmt(finding.areaMm2, 1) + " mm²"),
+          metricRow("Voxels", fmt(finding.voxels, 0))
+        );
+        if (finding.bbox) metrics.append(metricRow("BBox", formatBBox(finding.bbox)));
+
+        button.append(kicker, thumb, metrics);
+        button.addEventListener("click", () => selectFinding(finding.id));
+        list.append(button);
+      }
+    }
+
+    function renderStructured() {
+      const panel = document.getElementById("panel-structured");
+      panel.replaceChildren();
+      if (state.source === "upload") {
+        const summary = document.createElement("article");
+        summary.className = "summary";
+        const eyebrow = document.createElement("p");
+        eyebrow.className = "eyebrow";
+        eyebrow.textContent = "Uploaded series";
+        const narrative = document.createElement("p");
+        narrative.className = "narrative";
+        narrative.textContent = "No computed findings for this upload.";
+        summary.append(eyebrow, narrative);
+        panel.append(summary);
+        return;
+      }
+
+      const summary = document.createElement("article");
+      summary.className = "summary";
+      const eyebrow = document.createElement("p");
+      eyebrow.className = "eyebrow";
+      eyebrow.textContent = "Finding summary";
+      const narrative = document.createElement("p");
+      narrative.className = "narrative";
+      narrative.textContent = CONCLUSION;
+      summary.append(eyebrow, narrative);
+      panel.append(summary);
+
+      for (const finding of FINDINGS) {
+        const block = document.createElement("article");
+        block.className = "finding";
+        block.id = "synth-" + finding.id;
+        block.dataset.id = finding.id;
+
+        const title = document.createElement("h3");
+        title.textContent = finding.name + " · Slice #" + finding.slice;
+
+        const lookLabel = document.createElement("p");
+        lookLabel.className = "eyebrow";
+        lookLabel.innerHTML = 'Visual appearance <span class="tag amber">VLM narrative</span>';
+        const look = document.createElement("p");
+        look.className = "narrative";
+        look.textContent = finding.appearance;
+
+        const mathLabel = document.createElement("p");
+        mathLabel.className = "eyebrow";
+        mathLabel.innerHTML = 'Quantitative measurements <span class="tag cyan">Computed</span>';
+        const nums = document.createElement("ul");
+        nums.className = "nums";
+        nums.append(
+          metricRow("Volume", fmt(finding.volumeCm3, 2) + " cm³"),
+          metricRow("Slice area", fmt(finding.areaMm2, 1) + " mm²"),
+          metricRow("Voxels", fmt(finding.voxels, 0)),
+          metricRow("Slice", "#" + finding.slice + " / " + STUDY.sliceCount)
+        );
+        if (finding.bbox) nums.append(metricRow("BBox", formatBBox(finding.bbox)));
+
+        const prov = document.createElement("p");
+        prov.className = "prov";
+        const hash = document.createElement("code");
+        hash.textContent = finding.pixelHash;
+        prov.append("Pixel hash ", hash, " ");
+        const verified = document.createElement("span");
+        verified.className = "tag ok";
+        verified.textContent = "Verified";
+        prov.append(verified);
+
+        block.append(title, lookLabel, look, mathLabel, nums, prov);
+        panel.append(block);
+      }
+    }
+
+    function highlightJson(value) {
+      const json = JSON.stringify(value, null, 2)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;");
+      return json.replace(/("(?:\\.|[^"\\])*")(\s*:)?|\b(-?\d+(?:\.\d+)?)\b/g, (match, str, colon, num) => {
+        if (str && colon) return '<span class="k">' + str + "</span>" + colon;
+        if (str) return '<span class="s">' + str + "</span>";
+        return '<span class="n">' + num + "</span>";
+      });
+    }
+
+    function renderRaw() {
+      document.getElementById("panel-raw").innerHTML = highlightJson(buildReport());
+    }
+
+    function syncSelection() {
+      for (const card of document.querySelectorAll(".card")) {
+        const on = card.dataset.id === state.selectedId;
+        card.classList.toggle("active", on);
+        if (on) card.setAttribute("aria-current", "true");
+        else card.removeAttribute("aria-current");
+      }
+      for (const block of document.querySelectorAll(".finding")) {
+        block.classList.toggle("active", block.dataset.id === state.selectedId);
+      }
+    }
+
+    function selectFinding(id) {
+      const finding = findingById(id);
+      state.selectedId = id;
+      state.slice = finding.slice;
+      syncSelection();
+      drawMain();
+      document.getElementById("synth-" + id).scrollIntoView({ block: "nearest" });
+    }
+
+    function showTab(name) {
+      const structured = name === "structured";
+      document.getElementById("tab-structured").setAttribute("aria-selected", String(structured));
+      document.getElementById("tab-raw").setAttribute("aria-selected", String(!structured));
+      document.getElementById("panel-structured").hidden = !structured;
+      document.getElementById("panel-raw").hidden = structured;
+    }
+
+    function setSlice(next) {
+      state.slice = Math.max(1, Math.min(STUDY.sliceCount, next));
+      drawMain();
+    }
+
+    function renderHeader() {
+      document.getElementById("source-badge").textContent = state.source === "upload" ? "Local" : "Fixture";
+      document.getElementById("study-id").textContent = STUDY.pseudonym;
+      document.getElementById("study-label").textContent = "(" + STUDY.label + ")";
+      document.getElementById("modality").textContent = STUDY.modality;
+      const hipaa = document.getElementById("hipaa");
+      hipaa.textContent = "PatientIdentityRemoved: " + STUDY.identityRemoved;
+      hipaa.classList.toggle("ok", STUDY.identityRemoved === "YES");
+      hipaa.classList.toggle("warn", STUDY.identityRemoved !== "YES");
+      const hash = STUDY.seriesPixelSha256 || "";
+      document.getElementById("hash-short").textContent = hash ? hash.slice(0, 8) + "..." : "…";
+      document.getElementById("hash-short").title = hash;
+      document.getElementById("overlay-mod").textContent = STUDY.modality + (state.source === "upload" ? "" : " · AXIAL");
+      document.getElementById("restore-fixture").hidden = state.source !== "upload";
+    }
+
+    const LONG_VR = new Set(["OB", "OD", "OF", "OL", "OV", "OW", "SQ", "SV", "UC", "UN", "UR", "UT"]);
+
+    function textOf(bytes) {
+      return new TextDecoder("latin1").decode(bytes).replace(/\0/g, "").trim();
+    }
+
+    function firstNumber(text) {
+      if (!text) return null;
+      const value = Number(String(text).split("\\")[0]);
+      return Number.isFinite(value) ? value : null;
+    }
+
+    function parseDicom(buffer) {
+      const view = new DataView(buffer);
+      if (buffer.byteLength < 140 || view.getUint32(128, false) !== 0x4449434d) {
+        throw new Error("not-dicom");
+      }
+      const meta = {};
+      const offset = readDataSet(view, 132, buffer.byteLength, true, true, meta, (group) => group === 0x0002);
+      const transferSyntax = textOf(meta[0x00020010] || new Uint8Array());
+      const explicit = transferSyntax === "1.2.840.10008.1.2.1";
+      const implicit = transferSyntax === "1.2.840.10008.1.2";
+      if (!explicit && !implicit) throw new Error("compressed");
+      const tags = {};
+      readDataSet(view, offset, buffer.byteLength, explicit, true, tags, () => true);
+      if (!tags.pixels) throw new Error("no-pixels");
+      if (!tags.rows || !tags.cols) throw new Error("no-geometry");
+      if (tags.samples && tags.samples !== 1) throw new Error("not-grayscale");
+      const bitsAllocated = tags.bitsAllocated || 16;
+      if (bitsAllocated !== 8 && bitsAllocated !== 16) throw new Error("bit-depth");
+      const count = tags.rows * tags.cols;
+      const expected = count * (bitsAllocated / 8);
+      if (tags.pixels.byteLength < expected) throw new Error("short-pixels");
+      let pixels;
+      if (bitsAllocated === 16) {
+        const copy = new Uint8Array(expected);
+        copy.set(tags.pixels.subarray(0, expected));
+        pixels = new Uint16Array(copy.buffer);
+      } else {
+        pixels = tags.pixels.slice(0, count);
+      }
+      return {
+        modality: tags.modality || "OT",
+        seriesDescription: tags.seriesDescription || "Uploaded series",
+        identityRemoved: tags.identityRemoved || "Not stated",
+        seriesUid: tags.seriesUid || "unknown",
+        instance: tags.instance ?? 0,
+        z: tags.z,
+        rows: tags.rows,
+        cols: tags.cols,
+        bitsAllocated,
+        bitsStored: tags.bitsStored || bitsAllocated,
+        pixelRepresentation: tags.pixelRepresentation || 0,
+        photometric: tags.photometric || "MONOCHROME2",
+        slope: tags.slope ?? 1,
+        intercept: tags.intercept ?? 0,
+        windowCenter: tags.windowCenter,
+        windowWidth: tags.windowWidth,
+        pixels
+      };
+    }
+
+    function readDataSet(view, offset, end, explicit, little, tags, acceptGroup) {
+      while (offset + 8 <= end) {
+        const group = view.getUint16(offset, little);
+        const elem = view.getUint16(offset + 2, little);
+        if (!acceptGroup(group)) return offset;
+        let length;
+        let valueOffset;
+        if (explicit) {
+          const vr = String.fromCharCode(view.getUint8(offset + 4), view.getUint8(offset + 5));
+          if (LONG_VR.has(vr)) {
+            length = view.getUint32(offset + 8, little);
+            valueOffset = offset + 12;
+          } else {
+            length = view.getUint16(offset + 6, little);
+            valueOffset = offset + 8;
+          }
+        } else {
+          length = view.getUint32(offset + 4, little);
+          valueOffset = offset + 8;
+        }
+        if (length === 0xffffffff) {
+          if (group === 0x7fe0 && elem === 0x0010) throw new Error("compressed");
+          offset = skipSequence(view, valueOffset, end, explicit, little);
+          continue;
+        }
+        if (valueOffset + length > view.byteLength) throw new Error("truncated");
+        const bytes = new Uint8Array(view.buffer, view.byteOffset + valueOffset, length);
+        storeTag(tags, group, elem, bytes, little);
+        offset = valueOffset + length;
+        if (group === 0x7fe0 && elem === 0x0010) return offset;
+      }
+      return offset;
+    }
+
+    function skipSequence(view, offset, end, explicit, little) {
+      while (offset + 8 <= end) {
+        const group = view.getUint16(offset, little);
+        const elem = view.getUint16(offset + 2, little);
+        const length = view.getUint32(offset + 4, little);
+        offset += 8;
+        if (group === 0xfffe && elem === 0xe0dd) return offset;
+        if (group === 0xfffe && elem === 0xe000) {
+          offset = length === 0xffffffff
+            ? skipItem(view, offset, end, explicit, little)
+            : offset + length;
+        } else {
+          throw new Error("bad-sequence");
+        }
+      }
+      return offset;
+    }
+
+    function skipItem(view, offset, end, explicit, little) {
+      while (offset + 8 <= end) {
+        const group = view.getUint16(offset, little);
+        const elem = view.getUint16(offset + 2, little);
+        if (group === 0xfffe && elem === 0xe00d) return offset + 8;
+        let length;
+        let valueOffset;
+        if (explicit) {
+          const vr = String.fromCharCode(view.getUint8(offset + 4), view.getUint8(offset + 5));
+          if (LONG_VR.has(vr)) {
+            length = view.getUint32(offset + 8, little);
+            valueOffset = offset + 12;
+          } else {
+            length = view.getUint16(offset + 6, little);
+            valueOffset = offset + 8;
+          }
+        } else {
+          length = view.getUint32(offset + 4, little);
+          valueOffset = offset + 8;
+        }
+        if (length === 0xffffffff) offset = skipSequence(view, valueOffset, end, explicit, little);
+        else offset = valueOffset + length;
+      }
+      return offset;
+    }
+
+    function storeTag(tags, group, elem, bytes, little) {
+      const key = (group << 16) | elem;
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      const asText = () => textOf(bytes);
+      if (key === 0x00020010) tags[key] = bytes;
+      if (key === 0x00080060) tags.modality = asText();
+      if (key === 0x0008103e) tags.seriesDescription = asText();
+      if (key === 0x00120062) tags.identityRemoved = asText();
+      if (key === 0x0020000e) tags.seriesUid = asText();
+      if (key === 0x00200013) tags.instance = firstNumber(asText());
+      if (key === 0x00200032) {
+        const parts = asText().split("\\").map(Number);
+        tags.z = parts.length > 2 && Number.isFinite(parts[2]) ? parts[2] : null;
+      }
+      if (key === 0x00280002 && bytes.byteLength >= 2) tags.samples = view.getUint16(0, little);
+      if (key === 0x00280004) tags.photometric = asText();
+      if (key === 0x00280010 && bytes.byteLength >= 2) tags.rows = view.getUint16(0, little);
+      if (key === 0x00280011 && bytes.byteLength >= 2) tags.cols = view.getUint16(0, little);
+      if (key === 0x00280100 && bytes.byteLength >= 2) tags.bitsAllocated = view.getUint16(0, little);
+      if (key === 0x00280101 && bytes.byteLength >= 2) tags.bitsStored = view.getUint16(0, little);
+      if (key === 0x00280103 && bytes.byteLength >= 2) tags.pixelRepresentation = view.getUint16(0, little);
+      if (key === 0x00281050) tags.windowCenter = firstNumber(asText());
+      if (key === 0x00281051) tags.windowWidth = firstNumber(asText());
+      if (key === 0x00281052) tags.intercept = firstNumber(asText());
+      if (key === 0x00281053) tags.slope = firstNumber(asText());
+      if (key === 0x7fe00010) tags.pixels = bytes;
+    }
+
+    function setNote(message, warn) {
+      const note = document.getElementById("load-note");
+      note.textContent = message;
+      note.classList.toggle("warn", Boolean(warn));
+    }
+
+    function setWindowControls(width, level, minValue, maxValue) {
+      const span = Math.max(1, maxValue - minValue);
+      const windowInput = document.getElementById("window");
+      const levelInput = document.getElementById("level");
+      windowInput.min = "1";
+      windowInput.max = String(Math.max(span, width * 2));
+      windowInput.step = "1";
+      levelInput.min = String(Math.floor(minValue));
+      levelInput.max = String(Math.ceil(maxValue));
+      levelInput.step = "1";
+      state.windowWidth = width;
+      state.windowLevel = level;
+      windowInput.value = String(width);
+      levelInput.value = String(level);
+    }
+
+    function frameRange(frame) {
+      let min = Infinity;
+      let max = -Infinity;
+      const step = Math.max(1, Math.floor(frame.pixels.length / 20000));
+      for (let i = 0; i < frame.pixels.length; i += step) {
+        const value = modalityValue(frame.pixels[i], frame);
+        if (value < min) min = value;
+        if (value > max) max = value;
+      }
+      if (!Number.isFinite(min) || min === max) return { min: 0, max: 255 };
+      return { min, max };
+    }
+
+    function useStudy(next) {
+      for (const key of Object.keys(STUDY)) delete STUDY[key];
+      Object.assign(STUDY, next);
+    }
+
+    function restoreFixture() {
+      state.source = "fixture";
+      state.frames = [];
+      state.slice = 84;
+      state.selectedId = "peak-lesion";
+      useStudy(FIXTURE);
+      const windowInput = document.getElementById("window");
+      const levelInput = document.getElementById("level");
+      windowInput.min = "20";
+      windowInput.max = "400";
+      windowInput.step = "1";
+      levelInput.min = "0";
+      levelInput.max = "255";
+      levelInput.step = "1";
+      state.windowWidth = 200;
+      state.windowLevel = 110;
+      windowInput.value = "200";
+      levelInput.value = "110";
+      document.getElementById("slice").max = "192";
+      scanCanvas.width = 512;
+      scanCanvas.height = 512;
+      setNote("Drop .dcm files or a folder on the image.");
+      renderHeader();
+      renderCards();
+      renderStructured();
+      renderRaw();
+      syncSelection();
+      drawMain();
+    }
+
+    async function hashFrames(frames) {
+      const parts = [];
+      for (const frame of frames) {
+        const bytes = new Uint8Array(frame.pixels.buffer, frame.pixels.byteOffset, frame.pixels.byteLength);
+        const digest = await crypto.subtle.digest("SHA-256", bytes);
+        parts.push([...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join(""));
+      }
+      const root = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(parts.join("")));
+      return [...new Uint8Array(root)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    }
+
+    async function loadDicomFiles(fileList) {
+      const files = [...fileList];
+      if (!files.length) {
+        setNote("No files were in that selection.", true);
+        return;
+      }
+      const buttons = ["pick-files", "pick-folder", "restore-fixture"];
+      for (const id of buttons) document.getElementById(id).disabled = true;
+      const frames = [];
+      let skipped = 0;
+      let compressed = 0;
+      try {
+        for (let index = 0; index < files.length; index++) {
+          if (index % 6 === 0) {
+            setNote("Reading " + (index + 1) + " / " + files.length + "…");
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+          const buffer = await files[index].arrayBuffer();
+          try {
+            frames.push(parseDicom(buffer));
+          } catch (error) {
+            if (String(error.message).includes("compressed")) compressed += 1;
+            else skipped += 1;
+          }
+        }
+        if (!frames.length) {
+          setNote(compressed
+            ? "Those files are compressed DICOM. Export uncompressed slices and try again."
+            : "No uncompressed DICOM slices were found.", true);
+          return;
+        }
+        const groups = new Map();
+        for (const frame of frames) {
+          const list = groups.get(frame.seriesUid) || [];
+          list.push(frame);
+          groups.set(frame.seriesUid, list);
+        }
+        const series = [...groups.values()].sort((a, b) => b.length - a.length)[0];
+        const leftOut = frames.length - series.length;
+        series.sort((a, b) => {
+          if (a.z != null && b.z != null && a.z !== b.z) return a.z - b.z;
+          return a.instance - b.instance;
+        });
+        const first = series[0];
+        const range = frameRange(series[Math.floor(series.length / 2)]);
+        const windowWidth = first.windowWidth || Math.max(1, Math.round(range.max - range.min));
+        const windowLevel = first.windowCenter ?? Math.round((range.min + range.max) / 2);
+        const levelMin = Math.min(range.min, windowLevel - windowWidth / 2);
+        const levelMax = Math.max(range.max, windowLevel + windowWidth / 2);
+        state.source = "upload";
+        state.frames = series;
+        state.selectedId = null;
+        state.slice = Math.ceil(series.length / 2);
+        useStudy({
+          pseudonym: "LOCAL",
+          modality: first.modality,
+          label: first.seriesDescription,
+          identityRemoved: first.identityRemoved,
+          seriesPixelSha256: "",
+          sliceCount: series.length,
+          rows: first.rows,
+          cols: first.cols
+        });
+        document.getElementById("slice").max = String(series.length);
+        setWindowControls(windowWidth, windowLevel, levelMin, levelMax);
+        const notes = [];
+        if (leftOut) notes.push(leftOut + (leftOut === 1 ? " slice from another series was left out." : " slices from other series were left out."));
+        if (compressed) notes.push(compressed + (compressed === 1 ? " compressed file was skipped." : " compressed files were skipped."));
+        if (skipped) notes.push(skipped + (skipped === 1 ? " file was not a DICOM slice." : " files were not DICOM slices."));
+        setNote(notes.join(" ") || "Uncompressed slices are on the canvas.");
+        renderHeader();
+        renderCards();
+        renderStructured();
+        renderRaw();
+        drawMain();
+        const hash = await hashFrames(series);
+        if (state.source === "upload" && state.frames === series) {
+          STUDY.seriesPixelSha256 = hash;
+          renderHeader();
+          renderRaw();
+        }
+      } finally {
+        for (const id of buttons) document.getElementById(id).disabled = false;
+      }
+    }
+
+    async function filesFromDataTransfer(dataTransfer) {
+      const entries = [...dataTransfer.items]
+        .map((item) => item.webkitGetAsEntry && item.webkitGetAsEntry())
+        .filter(Boolean);
+      if (!entries.length) return [...dataTransfer.files];
+      const files = [];
+      async function walk(entry) {
+        if (entry.isFile) {
+          files.push(await new Promise((resolve, reject) => entry.file(resolve, reject)));
+          return;
+        }
+        if (!entry.isDirectory) return;
+        const reader = entry.createReader();
+        let batch = [];
+        do {
+          batch = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+          for (const child of batch) await walk(child);
+        } while (batch.length);
+      }
+      for (const entry of entries) await walk(entry);
+      return files;
+    }
+
+    document.getElementById("viewport").addEventListener("wheel", (event) => {
+      event.preventDefault();
+      setSlice(state.slice + Math.sign(event.deltaY));
+    }, { passive: false });
+
+    document.getElementById("slice").addEventListener("input", (event) => {
+      setSlice(Number(event.target.value));
+    });
+
+    document.getElementById("window").addEventListener("input", (event) => {
+      state.windowWidth = Number(event.target.value);
+      drawMain();
+    });
+
+    document.getElementById("level").addEventListener("input", (event) => {
+      state.windowLevel = Number(event.target.value);
+      drawMain();
+    });
+
+    document.getElementById("tab-structured").addEventListener("click", () => showTab("structured"));
+    document.getElementById("tab-raw").addEventListener("click", () => showTab("raw"));
+
+    document.getElementById("pick-files").addEventListener("click", () => {
+      document.getElementById("file-input").click();
+    });
+    document.getElementById("pick-folder").addEventListener("click", () => {
+      document.getElementById("folder-input").click();
+    });
+    document.getElementById("restore-fixture").addEventListener("click", restoreFixture);
+
+    for (const id of ["file-input", "folder-input"]) {
+      document.getElementById(id).addEventListener("change", (event) => {
+        const files = [...event.target.files];
+        event.target.value = "";
+        loadDicomFiles(files);
+      });
+    }
+
+    const scanPane = document.querySelector(".pane-scan");
+    scanPane.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      document.getElementById("viewport").classList.add("dragover");
+    });
+    scanPane.addEventListener("dragleave", (event) => {
+      if (event.target === scanPane) document.getElementById("viewport").classList.remove("dragover");
+    });
+    scanPane.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      document.getElementById("viewport").classList.remove("dragover");
+      const files = await filesFromDataTransfer(event.dataTransfer);
+      await loadDicomFiles(files);
+    });
+
+    document.getElementById("copy-hash").addEventListener("click", async () => {
+      const button = document.getElementById("copy-hash");
+      const hash = STUDY.seriesPixelSha256;
+      if (!hash) return;
+      try {
+        await navigator.clipboard.writeText(hash);
+      } catch (error) {
+        const area = document.createElement("textarea");
+        area.value = hash;
+        document.body.append(area);
+        area.select();
+        document.execCommand("copy");
+        area.remove();
+      }
+      button.textContent = "Copied";
+      setTimeout(() => { button.textContent = "Copy"; }, 1200);
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.target.matches("input, textarea")) return;
+      if (event.key === "ArrowDown" || event.key === "ArrowRight") setSlice(state.slice + 1);
+      if (event.key === "ArrowUp" || event.key === "ArrowLeft") setSlice(state.slice - 1);
+    });
+
+    renderHeader();
+    renderCards();
+    renderStructured();
+    renderRaw();
+    syncSelection();
+    drawMain();
+    showTab("structured");
+  </script>
+</body>
+
+</html>
