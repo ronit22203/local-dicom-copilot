@@ -1,0 +1,33 @@
+# Local Python environments and secrets
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Python build and test artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.ipynb_checkpoints/
+
+# IDC client caches (the catalog is reproducible via idc-index)
+.idc/
+
+# OS and editor files
+.DS_Store
+.idea/
+*.swp
+*.swo
+
+# data/raw_idc is tracked on purpose so downstream builders can clone the sample studies.
